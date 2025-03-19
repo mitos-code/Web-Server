@@ -1,5 +1,7 @@
 <?php
 session_start();
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 // Redirect if not an admin
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
@@ -7,6 +9,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     exit();
 }
 
+// Database connection settings
 $servername = "localhost";
 $username = "root"; // Change if needed
 $password = "Amirhmbm_2004"; // Change if needed
@@ -18,48 +21,55 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// Get the selected site and location from GET request
-$selected_site = isset($_GET['site']) ? $_GET['site'] : '';
-$selected_location = isset($_GET['location']) ? $_GET['location'] : '';
+// Get selected site and location safely
+$selected_site = $_GET['site'] ?? '';
+$selected_location = $_GET['location'] ?? '';
 
-// Build the SQL query
-$sql = "SELECT r.router_name, r.site, r.location, r.ip_address, rs.status
-        FROM routers r
-        LEFT JOIN router_status rs ON r.id = rs.router_id";
+// Determine the selected option from the dropdown
+$selected_option = $_GET['option'] ?? 'status'; // Default to 'status'
 
-$conditions = [];
-$params = [];
-$types = "";
-
-// Apply filters for site and location
-if (!empty($selected_site)) {
-    $conditions[] = "r.site = ?";
-    $types .= "s";
-    $params[] = $selected_site;
-}
-
-// Append conditions to SQL if any exist
-if (!empty($conditions)) {
-    $sql .= " WHERE " . implode(" AND ", $conditions);
-}
-
-$stmt = $conn->prepare($sql);
-if (!$stmt) {
-    die("Prepare failed: " . $conn->error);
-}
-
-// Bind parameters if any exist
-if (!empty($params)) {
-    $bind_names[] = $types;
-    foreach ($params as $key => $value) {
-        $bind_names[] = &$params[$key];
+// Fetch data based on the selected option
+if ($selected_option === 'wifi_users') {
+    // Fetch WiFi users data only for routers of type 'wifi_ap'
+    $sql = "SELECT wu.id, wu.ip_address, wu.router_name, wu.total_users
+            FROM wifi_users wu
+            JOIN routers r ON wu.router_name = r.router_name
+            WHERE r.site = ? AND r.location = ? AND r.type = 'WiFi AP'";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        die("Prepare failed: " . $conn->error);
     }
-    call_user_func_array([$stmt, 'bind_param'], $bind_names);
+    $stmt->bind_param("ss", $selected_site, $selected_location);
+    $stmt->execute();
+    $result = $stmt->get_result();
+} elseif ($selected_option === 'traffic') {
+    // Fetch router traffic data for the selected site and location
+    $sql = "SELECT router_name, ip_address, interface
+            FROM routers
+            WHERE site = ? AND location = ?";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        die("Prepare failed: " . $conn->error);
+    }
+    $stmt->bind_param("ss", $selected_site, $selected_location);
+    $stmt->execute();
+    $result = $stmt->get_result();
+} else {
+    // Default: Fetch router status data for the selected site and location
+    $sql = "SELECT r.router_name, r.site, r.location, r.ip_address, rs.status
+            FROM routers r
+            LEFT JOIN router_status rs ON r.router_name = rs.router_name AND r.ip_address = rs.ip_address
+            WHERE r.site = ? AND r.location = ?";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        die("Prepare failed: " . $conn->error);
+    }
+    $stmt->bind_param("ss", $selected_site, $selected_location);
+    $stmt->execute();
+    $result = $stmt->get_result();
 }
-
-$stmt->execute();
-$result = $stmt->get_result();
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,7 +77,7 @@ $result = $stmt->get_result();
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Panel</title>
   <style>
-      /* Your existing CSS styles */
+      /* Your original CSS styles */
       body {
           font-family: 'Poppins', sans-serif;
           background: linear-gradient(to bottom, #4facfe, #00f2fe);
@@ -90,9 +100,17 @@ $result = $stmt->get_result();
           border-bottom: 2px solid #2980b9;
           display: inline-block;
           padding-bottom: 5px;
-          margin-bottom: 20px;
+          margin-bottom: 10px;
       }
-      .router {
+      select {
+          width: 100%;
+          padding: 10px;
+          margin-bottom: 20px;
+          border-radius: 5px;
+          border: 1px solid #ccc;
+          font-size: 16px;
+      }
+      .router, .wifi-user, .traffic {
           background: #ecf0f1;
           padding: 10px;
           border-radius: 10px;
@@ -101,8 +119,9 @@ $result = $stmt->get_result();
           justify-content: space-between;
           align-items: center;
           transition: transform 0.3s;
+          cursor: pointer;
       }
-      .router:hover {
+      .router:hover, .wifi-user:hover, .traffic:hover {
           transform: scale(1.05);
       }
       .status-up, .status-down {
@@ -135,35 +154,79 @@ $result = $stmt->get_result();
       .logout-btn:hover {
           background-color: #c0392b;
       }
-      .manage-btn {
-          background-color: #27ae60;
-          color: white;
-      }
       .manage-btn:hover {
           background-color: #1e8449;
       }
   </style>
+  <script>
+      document.addEventListener('DOMContentLoaded', function() {
+          const adminOption = document.getElementById('admin_option');
+
+          adminOption.addEventListener('change', function() {
+              const selectedOption = this.value;
+              // Redirect to the same page with the selected option as a query parameter
+              window.location.href = `admin.php?option=${selectedOption}&site=<?= urlencode($selected_site) ?>&location=<?= urlencode($selected_location) ?>`;
+          });
+      });
+  </script>
 </head>
 <body>
   <div class="container">
       <h2>ADMIN PANEL</h2>
-      <!-- Router List -->
-      <?php
-      if ($result->num_rows > 0) {
-          while ($row = $result->fetch_assoc()) {
-              $statusClass = (strtolower($row["status"]) == "up") ? "status-up" : "status-down";
-              echo "<div class='router'>";
-              echo "<span>Router: " . htmlspecialchars($row["router_name"]) . "</span>";
-              echo "<span>IP: " . htmlspecialchars($row["ip_address"]) . "</span>";
-              echo "<span class='$statusClass'>" . strtoupper(htmlspecialchars($row["status"])) . "</span>";
-              echo "</div>";
-          }
-      } else {
-          echo "<p>No data available</p>";
-      }
-      $stmt->close();
-      $conn->close();
-      ?>
+      <select name="admin_option" id="admin_option">
+          <option value="status" <?= $selected_option === 'status' ? 'selected' : '' ?>>Status</option>
+          <option value="wifi_users" <?= $selected_option === 'wifi_users' ? 'selected' : '' ?>>WiFi Users</option>
+          <option value="traffic" <?= $selected_option === 'traffic' ? 'selected' : '' ?>>Traffic</option>
+      </select>
+
+      <!-- Display data based on the selected option -->
+      <?php if ($selected_option === 'wifi_users'): ?>
+          <!-- WiFi Users List -->
+          <h2>WiFi Users</h2>
+          <?php if ($result->num_rows > 0): ?>
+              <?php while ($row = $result->fetch_assoc()): ?>
+                  <!-- Make each row clickable and redirect to wifi_graph.php -->
+                  <div class="wifi-user" onclick="window.location.href='wifi_graph.php?router=<?= urlencode($row['router_name']) ?>&ip=<?= urlencode($row['ip_address']>
+                      <span>Device: <?= htmlspecialchars($row['router_name'] ?? '') ?></span>
+                      <span>IP: <?= htmlspecialchars($row['ip_address'] ?? '') ?></span>
+                      <span>Users: <?= htmlspecialchars($row['total_users'] ?? '') ?></span>
+                  </div>
+              <?php endwhile; ?>
+          <?php else: ?>
+              <p>No WiFi users data available for the selected site and location.</p>
+          <?php endif; ?>
+      <?php elseif ($selected_option === 'traffic'): ?>
+          <!-- Traffic List -->
+          <h2>Traffic</h2>
+          <?php if ($result->num_rows > 0): ?>
+              <?php while ($row = $result->fetch_assoc()): ?>
+                  <div class="traffic">
+                      <span>Device: <?= htmlspecialchars($row['router_name'] ?? '') ?></span>
+                      <span>IP: <?= htmlspecialchars($row['ip_address'] ?? '') ?></span>
+                      <span>Interface: <?= htmlspecialchars($row['interface'] ?? 'N/A') ?></span>
+                  </div>
+              <?php endwhile; ?>
+          <?php else: ?>
+              <p>No traffic data available for the selected site and location.</p>
+          <?php endif; ?>
+      <?php else: ?>
+          <!-- Router Status List -->
+          <?php if ($result->num_rows > 0): ?>
+              <?php while ($row = $result->fetch_assoc()): ?>
+                  <?php
+                  $statusClass = (strtolower($row["status"]) == "up") ? "status-up" : "status-down";
+                  ?>
+                  <div class="router" onclick="window.location.href='status_graph.php?router=<?= urlencode($row['router_name']) ?>'">
+                      <span>Device: <?= htmlspecialchars($row["router_name"] ?? '') ?></span>
+                      <span>IP: <?= htmlspecialchars($row["ip_address"] ?? '') ?></span>
+                      <span class="<?= $statusClass ?>"><?= strtoupper(htmlspecialchars($row["status"] ?? '')) ?></span>
+                  </div>
+              <?php endwhile; ?>
+          <?php else: ?>
+              <p>No data available for the selected site and location.</p>
+          <?php endif; ?>
+      <?php endif; ?>
+
       <!-- Admin Controls -->
       <a href="manage_devices.php?site=<?= urlencode($selected_site) ?>&location=<?= urlencode($selected_location) ?>" class="action-btn manage-btn">Manage Devices</a>
       <a href="location.php?site=<?= urlencode($selected_site) ?>&location=<?= urlencode($selected_location) ?>" class="action-btn logout-btn">Back to Location</a>
