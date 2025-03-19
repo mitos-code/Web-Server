@@ -43,12 +43,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Redirect based on user role
             if ($_SESSION['role'] === 'admin') {
-                header("Location: location.php"); // Redirect admin to location.php
-            } elseif ($_SESSION['role'] === 'guest') {
-                header("Location: guest.php"); // Redirect guest to guest.php
+                header("Location: location.php");
             } else {
-                // Handle other roles or unexpected cases
-                header("Location: login.php"); // Redirect to login page if role is invalid
+                header("Location: main_menu.php");
             }
             exit();
         } else {
@@ -161,3 +158,4 @@ $conn->close();
     </div>
 </body>
 </html>
+
