@@ -30,7 +30,7 @@ def get_all_routers():
     try:
         connection = mysql.connector.connect(**db_config)
         cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT id, router_name, ip_address FROM routers")
+        cursor.execute("SELECT router_name, ip_address FROM routers")
         routers = cursor.fetchall()
         cursor.close()
         connection.close()
@@ -61,7 +61,7 @@ def ping_router(ip):
 
     return None  # Return None if all pings fail
 
-def save_status_to_db(router_id, status, latency):
+def save_status_to_db(router_name, ip_address, status):
     """Insert or update router status in MySQL database when changes occur."""
     try:
         connection = mysql.connector.connect(**db_config)
@@ -71,16 +71,16 @@ def save_status_to_db(router_id, status, latency):
         current_time = datetime.now(TIMEZONE)
 
         query = """
-        INSERT INTO router_status (router_id, status, latency_ms, timestamp)
+        INSERT INTO router_status (router_name, ip_address, status, timestamp)
         VALUES (%s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE status = VALUES(status), latency_ms = VALUES(latency_ms), timestamp = VALUES(timestamp);
+        ON DUPLICATE KEY UPDATE status = VALUES(status), timestamp = VALUES(timestamp);
         """
 
-        cursor.execute(query, (router_id, status, latency, current_time))
+        cursor.execute(query, (router_name, ip_address, status, current_time))
         connection.commit()
         cursor.close()
         connection.close()
-        logger.info(f"Router {router_id} status '{status}' updated with latency {latency} ms at {current_time}")
+        logger.info(f"Router {router_name} ({ip_address}) status '{status}' updated at {current_time}")
     except mysql.connector.Error as e:
         logger.error(f"Database error: {e}")
 
@@ -88,17 +88,17 @@ def handle_router(router):
     """Process a single router's ping and status update."""
     global last_status
 
-    router_id, router_ip = router["id"], router["ip_address"]
+    router_name, router_ip = router["router_name"], router["ip_address"]
     latency = ping_router(router_ip)
     status = "up" if latency is not None else "down"
 
     # Get the previous state of the router
-    last_state = last_status.get(router_id, {"status": None, "latency": None})
+    last_state = last_status.get((router_name, router_ip), {"status": None})
 
-    # Check if status or latency has changed
-    if status != last_state["status"] or (latency is not None and abs(latency - last_state["latency"]) > 1.0):
-        save_status_to_db(router_id, status, latency)
-        last_status[router_id] = {"status": status, "latency": latency}
+    # Check if status has changed
+    if status != last_state["status"]:
+        save_status_to_db(router_name, router_ip, status)
+        last_status[(router_name, router_ip)] = {"status": status}
 
 def main():
     """Main function to continuously monitor routers using multithreading."""
@@ -122,7 +122,7 @@ def main():
             thread.join()
 
         # Ping every 60 seconds but insert data only if changes occur
-        time.sleep(2)
+        time.sleep(60)
 
 if __name__ == "__main__":
     try:
