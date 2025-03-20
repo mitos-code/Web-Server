@@ -37,9 +37,9 @@ if ($result->num_rows > 0) {
 }
 
 // Fetch router status count per location
-$status_sql = "SELECT r.location, COUNT(rs.id) AS total, SUM(CASE WHEN rs.status = 'up' THEN 1 ELSE 0 END) AS active
+$status_sql = "SELECT r.location, COUNT(rs.ip_address) AS total, SUM(CASE WHEN rs.status = 'up' THEN 1 ELSE 0 END) AS active
                FROM routers r
-               LEFT JOIN router_status rs ON r.id = rs.router_id
+               LEFT JOIN router_status rs ON r.ip_address = rs.ip_address AND r.router_name = rs.router_name
                GROUP BY r.location";
 $status_result = $conn->query($status_sql);
 if (!$status_result) {
