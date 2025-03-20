@@ -16,50 +16,16 @@ if ($conn->connect_error) {
 $site = isset($_GET['site']) ? $_GET['site'] : '';
 $location = isset($_GET['location']) ? $_GET['location'] : '';
 
-// Run Python script if AJAX request is received
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["run_python"])) {
-    $router_name = escapeshellarg($_POST["router_name"]);
-    $ssh_username = escapeshellarg($_POST["ssh_username"]);
-    $ssh_password = escapeshellarg($_POST["ssh_password"]);
-    $ip_address = escapeshellarg($_POST["ip_address"]);
-
-    // Execute the Python script with arguments
-    $command = "/home/mitos_/myenv/bin/python3 /var/www/html/interface.py --router_name $router_name --ip_address $ip_address --ssh_username $ssh_username --ssh_passwo>
-    $output = shell_exec($command);
-    echo json_encode(["output" => $output]);
-    exit();
-}
-
-// Fetch available interfaces
-$interfaces = [];
-$interface_sql = "SELECT interface FROM router_interfaces WHERE interface IS NOT NULL";
-$interface_result = $conn->query($interface_sql);
-
-if ($interface_result->num_rows > 0) {
-    while ($row = $interface_result->fetch_assoc()) {
-        // Split the comma-separated interface list into an array
-        $interfaces_array = explode(',', $row['interface']);
-        foreach ($interfaces_array as $iface) {
-            $iface = trim($iface); // Remove any extra spaces
-            if (!empty($iface) && !in_array($iface, $interfaces)) {
-                $interfaces[] = $iface; // Add to the interfaces array
-            }
-        }
-    }
-}
-
 // Handle form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_router'])) {
     $router_name = $_POST['router_name'];
     $ip_address = $_POST['ip_address'];
-    $type = $_POST['type'];
-    $interface = isset($_POST['interface']) ? $_POST['interface'] : NULL;
 
-    // Insert query without ssh_username and ssh_password
-    $insert_sql = "INSERT INTO routers (router_name, ip_address, site, location, type, interface)
-                   VALUES (?, ?, ?, ?, ?, ?)";
+    // Insert query into routers table
+    $insert_sql = "INSERT INTO routers (router_name, ip_address, site, location)
+                   VALUES (?, ?, ?, ?)";
     $insert_stmt = $conn->prepare($insert_sql);
-    $insert_stmt->bind_param("ssssss", $router_name, $ip_address, $site, $location, $type, $interface);
+    $insert_stmt->bind_param("ssss", $router_name, $ip_address, $site, $location);
 
     if ($insert_stmt->execute()) {
         $insert_stmt->close();
@@ -102,7 +68,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_router'])) {
             display: inline-block;
             padding-bottom: 5px;
         }
-        input, select {
+        input {
             width: calc(100% - 20px);
             padding: 10px;
             margin: 8px 0;
@@ -120,12 +86,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_router'])) {
             cursor: pointer;
             margin-top: 10px;
         }
-        .next-btn, .add-btn {
-            background-color: #28a745; /* Green color for Next and Add Devices buttons */
-        }
-        .interface-container {
-            display: none;
-            margin-top: 10px;
+        .add-btn {
+            background-color: #28a745; /* Green color for Add Devices button */
         }
         .back-btn, .edit-btn {
             display: block;
@@ -139,46 +101,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_router'])) {
         .back-btn { background-color: #ff0000; } /* Red color for Back button */
         .edit-btn { background-color: #f39c12; } /* Yellow color for Edit button */
     </style>
-    <script>
-        function runPythonScript() {
-            const routerName = document.getElementById('router_name').value;
-            const sshUsername = document.getElementById('ssh-username').value;
-            const sshPassword = document.getElementById('ssh-password').value;
-            const ipAddress = document.getElementById('ip_address').value;
-
-            if (!routerName || !sshUsername || !sshPassword || !ipAddress) {
-                alert("Please enter all required fields.");
-                return;
-            }
-
-            document.getElementById('next-btn').innerText = 'Loading...';
-            document.getElementById('next-btn').disabled = true;
-
-            fetch('manage_devices.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    run_python: '1',
-                    router_name: routerName,
-                    ssh_username: sshUsername,
-                    ssh_password: sshPassword,
-                    ip_address: ipAddress
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log("Python script output:", data.output);
-                document.getElementById('interface-container').style.display = 'block';
-                document.getElementById('next-btn').style.display = 'none';
-            })
-            .catch(error => {
-                console.error("Error executing script", error);
-                alert("Failed to execute script!");
-                document.getElementById('next-btn').innerText = 'Next';
-                document.getElementById('next-btn').disabled = false;
-            });
-        }
-    </script>
 </head>
 <body>
 <div class="container">
@@ -186,24 +108,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_router'])) {
     <form method="POST">
         <input type="text" id="router_name" name="router_name" placeholder="Device Name" required>
         <input type="text" id="ip_address" name="ip_address" placeholder="IP Address" required>
-        <input type="text" id="ssh-username" name="ssh_username" placeholder="Mikrotik Username">
-        <input type="password" id="ssh-password" name="ssh_password" placeholder="Mikrotik Password">
         <input type="hidden" name="site" value="<?= htmlspecialchars($site) ?>">
         <input type="hidden" name="location" value="<?= htmlspecialchars($location) ?>">
-        <select name="type" required>
-            <option value="Router">Router</option>
-            <option value="AP WiFi">AP WiFi</option>
-        </select>
-        <button type="button" id="next-btn" class="next-btn" onclick="runPythonScript()">Next</button>
-        <div class="interface-container" id="interface-container">
-            <select name="interface">
-                <option value="" selected disabled>Select Interface</option>
-                <?php foreach ($interfaces as $interface): ?>
-                    <option value="<?= htmlspecialchars($interface) ?>"><?= htmlspecialchars($interface) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <button type="submit" name="add_router" class="add-btn">Add Devices</button>
-        </div>
+        <button type="submit" name="add_router" class="add-btn">Add Devices</button>
     </form>
     <form action="edit_devices.php" method="get">
         <input type="hidden" name="site" value="<?php echo htmlspecialchars($site); ?>">
