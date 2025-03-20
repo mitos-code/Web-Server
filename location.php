@@ -37,9 +37,11 @@ if ($result->num_rows > 0) {
 }
 
 // Fetch router status count per location
-$status_sql = "SELECT r.location, COUNT(rs.ip_address) AS total, SUM(CASE WHEN rs.status = 'up' THEN 1 ELSE 0 END) AS active
+$status_sql = "SELECT r.location, COUNT(rs.id) AS total,
+                      SUM(CASE WHEN rs.status = 'up' THEN 1 ELSE 0 END) AS active
                FROM routers r
-               LEFT JOIN router_status rs ON r.ip_address = rs.ip_address AND r.router_name = rs.router_name
+               LEFT JOIN router_status rs
+               ON r.router_name = rs.router_name AND r.ip_address = rs.ip_address
                GROUP BY r.location";
 $status_result = $conn->query($status_sql);
 if (!$status_result) {
@@ -63,7 +65,7 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Router Locations</title>
+    <title>Devices Locations</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
         .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
@@ -75,12 +77,12 @@ $conn->close();
         .logout { background: red; color: white; }
         .manage-locations { background: green; color: white; }
         .user-approval { background: blue; color: white; }
-        .location { background: #007bff; color: white; padding: 10px; border-radius: 5px; cursor: pointer; margin-top: 10px; font-weight: bold; display: flex; justify-content: space-between; }
+        .location { background: #007bff; color: white; padding: 10px; border-radius: 5px; cursor: pointer; margin-top: 10px; font-weight: bold; display: flex; justify->
         .status { font-size: 14px; background: rgba(255, 255, 255, 0.2); padding: 5px 10px; border-radius: 5px; }
         .sites { display: none; padding: 10px; margin-left: 20px; border-left: 3px solid #007bff; }
         .site { background: #f8f9fa; padding: 3px 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; margin-top: 5px; }
         .site a { text-decoration: none; color: #007bff; font-weight: bold; }
-        .edit-location { background: orange; color: white; padding: 5px 8px; border-radius: 5px; text-decoration: none; font-size: 12px; }
+        .edit-location { background: orange; color: white; padding: 5px 8px; border-radius: 5px; text-decoration: none; font-size: 12px; margin-left: 10px; }
     </style>
     <script>
         function toggleSites(locationId) {
@@ -111,11 +113,13 @@ $conn->close();
             <div class="location" onclick="toggleSites('<?php echo htmlspecialchars($location); ?>')">
                 <span><?php echo htmlspecialchars($location); ?></span>
                 <span class="status">Active: <?php echo $data['active']; ?> / Total: <?php echo $data['total']; ?></span>
+                <!-- Edit Site button passes the location as a parameter -->
+                <a class="edit-location" href="edit_site.php?location=<?php echo urlencode($location); ?>">Edit Site</a>
             </div>
             <div class="sites" id="sites-<?php echo htmlspecialchars($location); ?>">
                 <?php foreach ($data['sites'] as $site): ?>
                     <div class="site">
-                        <a href="main_menu.php?location=<?php echo urlencode($location); ?>&site=<?php echo urlencode($site); ?>"><?php echo htmlspecialchars($site); ?></a>
+                        <a href="admin.php?location=<?php echo urlencode($location); ?>&site=<?php echo urlencode($site); ?>"><?php echo htmlspecialchars($site); ?></a>
                     </div>
                 <?php endforeach; ?>
             </div>
