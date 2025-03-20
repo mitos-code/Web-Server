@@ -25,7 +25,7 @@ $selected_location = isset($_GET['location']) ? $_GET['location'] : '';
 // Build the SQL query
 $sql = "SELECT r.router_name, r.site, r.location, r.ip_address, rs.status
         FROM routers r
-        LEFT JOIN router_status rs ON r.id = rs.router_id";
+        LEFT JOIN router_status rs ON r.router_name = rs.router_name AND r.ip_address = rs.ip_address";
 
 $conditions = [];
 $params = [];
