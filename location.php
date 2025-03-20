@@ -1,4 +1,5 @@
 <?php
+session_start();
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -68,7 +69,7 @@ $conn->close();
     <title>Devices Locations</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .header .left { flex: 1; text-align: left; }
         .header .center { flex: 1; text-align: center; }
@@ -77,12 +78,12 @@ $conn->close();
         .logout { background: red; color: white; }
         .manage-locations { background: green; color: white; }
         .user-approval { background: blue; color: white; }
-        .location { background: #007bff; color: white; padding: 10px; border-radius: 5px; cursor: pointer; margin-top: 10px; font-weight: bold; display: flex; justify->
-        .status { font-size: 14px; background: rgba(255, 255, 255, 0.2); padding: 5px 10px; border-radius: 5px; }
+        .location { background: #007bff; color: white; padding: 10px; border-radius: 5px; cursor: pointer; margin-top: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .status { font-size: 14px; background: rgba(255, 255, 255, 0.2); padding: 5px 10px; border-radius: 5px; margin-right: auto; }
+        .edit-location { background: orange; color: white; padding: 5px 8px; border-radius: 5px; text-decoration: none; font-size: 12px; margin-left: 10px; }
         .sites { display: none; padding: 10px; margin-left: 20px; border-left: 3px solid #007bff; }
         .site { background: #f8f9fa; padding: 3px 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; margin-top: 5px; }
         .site a { text-decoration: none; color: #007bff; font-weight: bold; }
-        .edit-location { background: orange; color: white; padding: 5px 8px; border-radius: 5px; text-decoration: none; font-size: 12px; margin-left: 10px; }
     </style>
     <script>
         function toggleSites(locationId) {
