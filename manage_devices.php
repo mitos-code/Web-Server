@@ -16,7 +16,7 @@ if ($conn->connect_error) {
 $site = isset($_GET['site']) ? $_GET['site'] : '';
 $location = isset($_GET['location']) ? $_GET['location'] : '';
 
-// Handle form submission
+// Handle form submission for adding a router
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_router'])) {
     $router_name = $_POST['router_name'];
     $ip_address = $_POST['ip_address'];
@@ -35,6 +35,39 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_router'])) {
         echo "Error: " . $conn->error;
     }
 }
+
+// Handle form submission for removing a router
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['remove_router'])) {
+    $router_id = $_POST['router_id'];
+
+    // Delete query from routers table
+    $delete_sql = "DELETE FROM routers WHERE id = ?";
+    $delete_stmt = $conn->prepare($delete_sql);
+    $delete_stmt->bind_param("i", $router_id);
+
+    if ($delete_stmt->execute()) {
+        $delete_stmt->close();
+        header("Location: manage_devices.php?site=" . urlencode($site) . "&location=" . urlencode($location));
+        exit();
+    } else {
+        echo "Error: " . $conn->error;
+    }
+}
+
+// Fetch all routers for the remove device dropdown
+$routers = [];
+$router_sql = "SELECT id, router_name, ip_address FROM routers WHERE site = ? AND location = ?";
+$router_stmt = $conn->prepare($router_sql);
+$router_stmt->bind_param("ss", $site, $location);
+$router_stmt->execute();
+$router_result = $router_stmt->get_result();
+
+if ($router_result->num_rows > 0) {
+    while ($row = $router_result->fetch_assoc()) {
+        $routers[] = $row;
+    }
+}
+$router_stmt->close();
 ?>
 
 <!DOCTYPE html>
@@ -89,7 +122,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_router'])) {
         .add-btn {
             background-color: #28a745; /* Green color for Add Devices button */
         }
-        .back-btn, .edit-btn {
+        .remove-btn {
+            background-color: #e74c3c; /* Red color for Remove Devices button */
+        }
+        .back-btn {
             display: block;
             margin-top: 20px;
             padding: 10px;
@@ -97,9 +133,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_router'])) {
             text-align: center;
             border-radius: 8px;
             text-decoration: none;
+            background-color: #ff0000; /* Red color for Back button */
         }
-        .back-btn { background-color: #ff0000; } /* Red color for Back button */
-        .edit-btn { background-color: #f39c12; } /* Yellow color for Edit button */
     </style>
 </head>
 <body>
@@ -112,10 +147,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_router'])) {
         <input type="hidden" name="location" value="<?= htmlspecialchars($location) ?>">
         <button type="submit" name="add_router" class="add-btn">Add Devices</button>
     </form>
-    <form action="edit_devices.php" method="get">
-        <input type="hidden" name="site" value="<?php echo htmlspecialchars($site); ?>">
-        <input type="hidden" name="location" value="<?php echo htmlspecialchars($location); ?>">
-        <button type="submit" class="edit-btn">Edit Devices</button>
+    <form method="POST">
+        <select name="router_id" required>
+            <option value="" selected disabled>Select Device to Remove</option>
+            <?php foreach ($routers as $router): ?>
+                <option value="<?= htmlspecialchars($router['id']) ?>">
+                    <?= htmlspecialchars($router['router_name']) ?> (<?= htmlspecialchars($router['ip_address']) ?>)
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit" name="remove_router" class="remove-btn">Remove Devices</button>
     </form>
     <!-- Back Button -->
     <a href="admin.php?site=<?= urlencode($site) ?>&location=<?= urlencode($location) ?>" class="back-btn">Back to Admin</a>
