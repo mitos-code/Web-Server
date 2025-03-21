@@ -153,7 +153,7 @@ $result = $stmt->get_result();
           while ($row = $result->fetch_assoc()) {
               $statusClass = (strtolower($row["status"]) == "up") ? "status-up" : "status-down";
               echo "<div class='router'>";
-              echo "<span>Router: " . htmlspecialchars($row["router_name"]) . "</span>";
+              echo "<span>Device: " . htmlspecialchars($row["router_name"]) . "</span>";
               echo "<span>IP: " . htmlspecialchars($row["ip_address"]) . "</span>";
               echo "<span class='$statusClass'>" . strtoupper(htmlspecialchars($row["status"])) . "</span>";
               echo "</div>";
