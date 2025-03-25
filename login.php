@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($_SESSION['role'] === 'admin') {
                 header("Location: location.php");
             } else {
-                header("Location: main_menu.php");
+                header("Location: guest.php");
             }
             exit();
         } else {
